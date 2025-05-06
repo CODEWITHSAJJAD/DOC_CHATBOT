@@ -1518,8 +1518,8 @@ class DocumentQnAApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Advanced Document Analysis & QnA System")
-        self.root.geometry("1100x650")
-        self.root.minsize(100, 650)
+        self.root.geometry("1050x650")
+        self.root.minsize(100, 600)
 
         # App state
         self.current_user = None
@@ -1578,6 +1578,9 @@ class DocumentQnAApp:
 
         self.zoom_var = DoubleVar(value=1.5)  # Add zoom_var for PDF viewer
 
+        # In __init__ of DocumentQnAApp:
+        self.root.configure(bg='#f8f9fc')
+
     def show_login_screen(self):
         self.clear_window()
 
@@ -1590,7 +1593,7 @@ class DocumentQnAApp:
         logo_frame.pack(pady=20)
 
         try:
-            logo_img = Image.open("logo.png").resize((100, 100), Image.LANCZOS)
+            logo_img = Image.open(resource_path("logo.png")).resize((100, 100), Image.LANCZOS)
             self.logo = ImageTk.PhotoImage(logo_img)
             ttk.Label(logo_frame, image=self.logo).pack()
         except:
@@ -1687,7 +1690,7 @@ class DocumentQnAApp:
 
         # Logo in the center
         try:
-            logo_img = Image.open("logo.png").resize((150, 150), Image.LANCZOS)
+            logo_img = Image.open(resource_path("logo.png")).resize((150, 150), Image.LANCZOS)
             self.logo = ImageTk.PhotoImage(logo_img)
             ttk.Label(centerpiece, image=self.logo, style='Logo.TLabel').pack(pady=20)
         except:
@@ -2969,7 +2972,7 @@ class DocumentQnAApp:
             side=LEFT)
 
         # Document grid view
-        canvas = Canvas(self.content_area)
+        canvas = Canvas(self.content_area, bg='#f8f9fc', highlightthickness=0, bd=0)
         scrollbar = ttk.Scrollbar(self.content_area, orient=VERTICAL, command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
 
@@ -3189,9 +3192,13 @@ class DocumentQnAApp:
 
 
 def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 if __name__ == "__main__":
