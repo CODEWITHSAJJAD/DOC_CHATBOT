@@ -2,7 +2,6 @@ import json
 import hashlib
 import sqlite3
 import re
-
 import faiss
 import numpy as np
 from tkinter import *
@@ -204,6 +203,10 @@ class SonnerToast:
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         self.toast.geometry(f"+{screen_width - width - 20}+{screen_height - height - 60}")
+        try:
+            self.toast.iconbitmap(resource_path("logo.ico"))
+        except Exception as e:
+            print(f"Error setting toast icon: {e}")
 
         self.canvas = tk.Canvas(self.toast, bg=bg_color, highlightthickness=0, bd=0, width=width, height=height)
         self.canvas.pack(fill="both", expand=True)
@@ -1932,7 +1935,7 @@ class DocumentQnAApp:
     def analyze_document(self):
         filepath = getattr(self, 'current_document_path', None)
         if not filepath or self.file_label.cget("text") == "No file selected":
-            SonnerToast(self.root, "Please select a document file first!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Please select a document file first!",variant='warning', buttons=[{"text": "OK", "command": None}])
             return
         self.upload_status.config(text="Analyzing document...")
         self.root.update()
@@ -1974,13 +1977,14 @@ class DocumentQnAApp:
             (doc_id,),
             fetch=True
         )
+
         if not result:
-            SonnerToast(self.root, "Document not found in database!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Document not found in database!",variant='error', buttons=[{"text": "OK", "command": None}])
             return
 
         filepath = result[0][0]
         if not os.path.exists(filepath):
-            SonnerToast(self.root, "The document file was not found at the original location!",
+            SonnerToast(self.root, "The document file was not found at the original location!",variant='error',
                         buttons=[{"text": "OK", "command": None}])
             return
 
@@ -1993,6 +1997,7 @@ class DocumentQnAApp:
 
         self.root.update()
         self.analyze_document_threaded(filepath)
+
 
     def show_chat_screen(self):
         self.clear_content_area()
@@ -2070,25 +2075,26 @@ class DocumentQnAApp:
         self.clear_content_area()
 
         # Main frame with improved layout
-        main_frame = ttk.Frame(self.content_area, padding=20)
+        main_frame = ttk.Frame(self.content_area, padding=20, style='Main.TFrame')
         main_frame.pack(fill=BOTH, expand=True)
+        self.style.configure('Main.TFrame', background='#f8f9fc')
 
         # Title with decorative line
-        title_frame = ttk.Frame(main_frame)
+        title_frame = ttk.Frame(main_frame, style='Main.TFrame')
         title_frame.pack(fill=X, pady=(0, 20))
         ttk.Label(title_frame, text="User Settings", font=('Helvetica', 16, 'bold')).pack(side=LEFT)
         ttk.Separator(title_frame, orient='horizontal').pack(side=LEFT, fill=X, expand=True, padx=10)
 
         # Two-column layout for profile and form
-        content_frame = ttk.Frame(main_frame)
+        content_frame = ttk.Frame(main_frame, style='Main.TFrame')
         content_frame.pack(fill=BOTH, expand=True)
 
         # Left column - Profile picture
-        left_frame = ttk.Frame(content_frame, width=200)
+        left_frame = ttk.Frame(content_frame, width=200, style='Main.TFrame')
         left_frame.pack(side=LEFT, fill=Y, padx=(0, 20))
 
         # Profile picture with border
-        profile_container = ttk.Frame(left_frame, relief='groove', borderwidth=2)
+        profile_container = ttk.Frame(left_frame, relief='groove', borderwidth=2, style='Main.TFrame')
         profile_container.pack(pady=10)
 
         # Fetch profile image path from DB
@@ -2100,22 +2106,26 @@ class DocumentQnAApp:
         profile_image_path = user_info[0][0] if user_info and user_info[0][0] else None
         try:
             if profile_image_path and os.path.exists(profile_image_path):
-                profile_img = Image.open(profile_image_path).resize((150, 150), Image.LANCZOS)
+                with open(profile_image_path, "rb") as f:
+                    profile_img = Image.open(io.BytesIO(f.read())).resize((150, 150), Image.LANCZOS)
+                    profile_img.load()
             else:
-                profile_img = Image.open(resource_path("user.png")).resize((150, 150), Image.LANCZOS)
+                with open(resource_path("user.png"), "rb") as f:
+                    profile_img = Image.open(io.BytesIO(f.read())).resize((150, 150), Image.LANCZOS)
+                    profile_img.load()
             self.profile_img = ImageTk.PhotoImage(profile_img)
             ttk.Label(profile_container, image=self.profile_img).pack()
         except Exception:
-            ttk.Label(profile_container, text="👤", font=('Helvetica', 72), padx=10, pady=10).pack()
+            ttk.Label(profile_container, text="👤", font=('Helvetica', 72)).pack(padx=10, pady=10)
         ttk.Button(left_frame, text="Change Picture", command=self.change_profile_picture, style='Secondary.TButton').pack(pady=5)
 
         # Right column - User information form
-        right_frame = ttk.Frame(content_frame)
+        right_frame = ttk.Frame(content_frame, style='Main.TFrame')
         right_frame.pack(side=RIGHT, fill=BOTH, expand=True)
 
         # Fetch ALL available user info from database
         user_info = DatabaseManager.execute_query(
-            """SELECT username, full_name, email, contact, 
+            """SELECT username, full_name, email, contact, \
                last_login, created_at FROM users WHERE id = ?""",
             (self.current_user_id,),
             fetch=True
@@ -2130,7 +2140,7 @@ class DocumentQnAApp:
             last_login = created_at = None
 
         # Form fields - always show all possible fields
-        form_frame = ttk.Frame(right_frame)
+        form_frame = ttk.Frame(right_frame, style='Main.TFrame')
         form_frame.pack(fill=X, pady=10)
 
         # Personal Information Section
@@ -2169,18 +2179,6 @@ class DocumentQnAApp:
                                                                    padx=5, pady=5,
                                                                    sticky='w')
 
-        # ttk.Label(form_frame, text="⏱ Last Login:").grid(row=len(fields) + 3, column=0,
-        #                                                  padx=5, pady=5, sticky=W)
-        # last_login_text = last_login.strftime("%Y-%m-%d %H:%M") if last_login else "Never"
-        # ttk.Label(form_frame, text=last_login_text).grid(row=len(fields) + 3, column=1,
-        #                                                  padx=5, pady=5, sticky='w')
-        #
-        # ttk.Label(form_frame, text="📅 Member Since:").grid(row=len(fields) + 4, column=0,
-        #                                                    padx=5, pady=5, sticky=W)
-        # created_text = created_at.strftime("%Y-%m-%d") if created_at else "Unknown"
-        # ttk.Label(form_frame, text=created_text).grid(row=len(fields) + 4, column=1,
-        #                                               padx=5, pady=5, sticky='w')
-
         # Password change section
         ttk.Label(form_frame, text="Change Password",
                   font=('Helvetica', 12, 'bold')).grid(row=len(fields) + 5, column=0,
@@ -2200,7 +2198,7 @@ class DocumentQnAApp:
             setattr(self, entry_name, entry)
 
         # Save button with improved styling
-        btn_frame = ttk.Frame(right_frame)
+        btn_frame = ttk.Frame(right_frame, style='Main.TFrame')
         btn_frame.pack(fill=X, pady=20)
 
         ttk.Button(btn_frame, text="Save Changes", command=self.save_settings,
@@ -2221,7 +2219,7 @@ class DocumentQnAApp:
             "UPDATE users SET full_name = ?, email = ?, contact = ? WHERE id = ?",
             (full_name, email, contact, self.current_user_id)
         )
-        SonnerToast(self.root, "Settings saved successfully!", buttons=[{"text": "OK", "command": None}])
+        SonnerToast(self.root, "Settings saved successfully!", variant='success',buttons=[{"text": "OK", "command": None}])
 
     def toggle_dark_mode(self):
         if self.dark_mode:
@@ -2389,7 +2387,7 @@ class DocumentQnAApp:
         def on_load_chat():
             selected_item = tree.focus()
             if not selected_item:
-                SonnerToast(self.root, "Please select a chat from the list!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Please select a chat from the list!",variant='warning', buttons=[{"text": "OK", "command": None}])
                 return
             chat_id = int(selected_item)  # Use iid as chat_id
             try:
@@ -2424,15 +2422,17 @@ class DocumentQnAApp:
                                                 break
                                         break
                             else:
-                                SonnerToast(self.root, "The document file was not found at the original location!", buttons=[{"text": "OK", "command": None}])
+                                SonnerToast(self.root, "The document file was not found at the original location!",variant="warning", buttons=[{"text": "OK", "command": None}])
                         else:
-                            SonnerToast(self.root, "Document information not found!", buttons=[{"text": "OK", "command": None}])
+                            SonnerToast(self.root, "Document information not found!", variant='error',buttons=[{"text": "OK", "command": None}])
                     else:
                         self.current_document = None
                         self.current_document_id = None
                         self.show_chat_screen()
+                        SonnerToast(self.root, "Loaded Successfully!", variant='success',
+                                    buttons=[{"text": "ok", "command": None}])
                 else:
-                    SonnerToast(self.root, "Could not load the selected chat!", buttons=[{"text": "OK", "command": None}])
+                    SonnerToast(self.root, "Could not load the selected chat!", variant='error',buttons=[{"text": "OK", "command": None}])
             except Exception as e:
                 print(f"Error loading chat: {e}")
                 SonnerToast(self.root, "An error occurred while loading the chat!", buttons=[{"text": "OK", "command": None}])
@@ -2440,18 +2440,18 @@ class DocumentQnAApp:
         def on_delete_chat():
             selected_item = tree.focus()
             if not selected_item:
-                SonnerToast(self.root, "Please select a chat to delete.", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Please select a chat to delete.",variant='warning', buttons=[{"text": "OK", "command": None}])
                 return
             chat_id = int(selected_item)  # Use iid as chat_id
             def on_yes():
                 DatabaseManager.execute_query("DELETE FROM chats WHERE id = ? AND user_id = ?",
                                               (chat_id, self.current_user_id))
                 tree.delete(selected_item)
-                SonnerToast(self.root, "Chat deleted.", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Chat deleted.",variant='success', buttons=[{"text": "OK", "command": None}])
                 self.show_history_screen()  # Refresh after delete
             def on_no():
                 pass
-            SonnerToast(self.root, "Are you sure you want to delete this chat?", buttons=[{"text": "Yes", "command": on_yes}, {"text": "No", "command": on_no}], variant='warning')
+            SonnerToast(self.root, "Are you sure you want to delete this chat?",variant='info', buttons=[{"text": "Yes", "command": on_yes}, {"text": "No", "command": on_no}])
 
         ttk.Button(self.content_area, text="Load Selected Chat", command=on_load_chat, style='Secondary.TButton').pack(
             pady=5)
@@ -2471,7 +2471,7 @@ class DocumentQnAApp:
         password = self.password_entry.get()
 
         if not username or not password:
-            SonnerToast(self.root, "Please enter both username and password!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Please enter both username and password!",variant='warning', buttons=[{"text": "OK", "command": None}])
             return
 
         success, message = UserManager.authenticate_user(username, password)
@@ -2489,9 +2489,9 @@ class DocumentQnAApp:
                 self.show_main_app()
                 SonnerToast(self.root, "Welcome Back!", variant='success', buttons=[{"text": "OK", "command": None}])
             else:
-                SonnerToast(self.root, "User data not found!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "User data not found!",variant='error', buttons=[{"text": "OK", "command": None}])
         else:
-            SonnerToast(self.root, "Login Failed: " + message, buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Login Failed: " + message, variant='error',buttons=[{"text": "OK", "command": None}])
 
     def handle_register(self):
         # Get all fields
@@ -2504,11 +2504,11 @@ class DocumentQnAApp:
 
         # Validate all fields
         if not all([name, email, contact, username, password, confirm]):
-            SonnerToast(self.root, "Please fill in all fields!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Please fill in all fields!",variant='warning', buttons=[{"text": "OK", "command": None}])
             return
 
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
-            SonnerToast(self.root, "Please enter a valid email address!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Please enter a valid email address!",variant='warning', buttons=[{"text": "OK", "command": None}])
             return
 
         if password != confirm:
@@ -2522,7 +2522,7 @@ class DocumentQnAApp:
             fetch=True
         )
         if result:
-            SonnerToast(self.root, "Username is already taken!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Username is already taken!",variant='error', buttons=[{"text": "OK", "command": None}])
             return
 
         # Create new user with additional fields
@@ -2537,10 +2537,10 @@ class DocumentQnAApp:
             # Create user chat directory
             os.makedirs(os.path.join(CHATS_DIR, username), exist_ok=True)
 
-            SonnerToast(self.root, "Registration successful!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Registration successful!",variant='success', buttons=[{"text": "OK", "command": None}])
             self.show_login_screen()
         except Exception as e:
-            SonnerToast(self.root, "Registration failed: " + str(e), buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Registration failed: " + str(e), variant='error',buttons=[{"text": "OK", "command": None}])
 
     def check_username_availability(self, event=None):
         username = self.reg_username_entry.get().strip()
@@ -2655,7 +2655,7 @@ class DocumentQnAApp:
         if self.progress_window:
             self.progress_window.destroy()
             self.progress_window = None
-        SonnerToast(self.root, "Document processing was cancelled!", buttons=[{"text": "OK", "command": None}])
+        SonnerToast(self.root, "Document processing was cancelled!",variant='success', buttons=[{"text": "OK", "command": None}])
 
     def document_analysis_complete(self, success, filepath):
         # Handle completion of document analysis
@@ -2693,12 +2693,12 @@ class DocumentQnAApp:
             else:
                 if hasattr(self, 'upload_status') and self.upload_status and self.upload_status.winfo_exists():
                     self.upload_status.config(text="Error analyzing document")
-                SonnerToast(self.root, "Failed to analyze the document!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Failed to analyze the document!",variant='error', buttons=[{"text": "OK", "command": None}])
         except Exception as e:
             print(f"Error completing document analysis: {e}")
             if hasattr(self, 'upload_status') and self.upload_status and self.upload_status.winfo_exists():
                 self.upload_status.config(text="Error analyzing document")
-            SonnerToast(self.root, "An unexpected error occurred while analyzing the document!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "An unexpected error occurred while analyzing the document!",variant='error', buttons=[{"text": "OK", "command": None}])
 
     def ask_question(self):
         """Process user question and generate answer with improved accuracy. Save chat to DB after each Q&A."""
@@ -2795,28 +2795,28 @@ class DocumentQnAApp:
     def show_reference(self, source):
         try:
             if not self.analyzer.current_doc:
-                SonnerToast(self.root, "No document is currently loaded!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "No document is currently loaded!",variant='warning', buttons=[{"text": "OK", "command": None}])
                 return
             if not source or not source.get('page'):
-                SonnerToast(self.root, "Invalid reference source!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Invalid reference source!", variant='error',buttons=[{"text": "OK", "command": None}])
                 return
             self.current_highlighted_source = source.copy()
             page_num = source.get('page', 1) - 1
             if page_num < 0 or page_num >= len(self.analyzer.current_doc):
-                SonnerToast(self.root, f"Invalid page number: {page_num + 1}", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, f"Invalid page number: {page_num + 1}", variant='error',buttons=[{"text": "OK", "command": None}])
                 return
             print(f"[DEBUG] Jumping to page {page_num + 1} for highlight, text: {source.get('text', '')[:50]}")
             self.update_ref_pdf_viewer(highlight=True)
             self.update_nav_buttons()
         except Exception as e:
             print(f"Error showing reference: {e}")
-            SonnerToast(self.root, "Could not display the reference!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Could not display the reference!",variant='warning', buttons=[{"text": "OK", "command": None}])
 
     def load_selected_chat(self, tree):
         """Load a selected chat from history"""
         selected_item = tree.focus()
         if not selected_item:
-            SonnerToast(self.root, "Please select a chat from the list!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Please select a chat from the list!", variant='warning',buttons=[{"text": "OK", "command": None}])
             return
 
         item_data = tree.item(selected_item)
@@ -2860,19 +2860,21 @@ class DocumentQnAApp:
                                     self.current_highlighted_source = msg['sources'][0]
                                     self.update_ref_pdf_viewer(highlight=True)
                                     break
+                            SonnerToast(self.root, "Chat Loaded successfully!",variant='success',
+                                        buttons=[{"text": "OK", "command": None}])
                         else:
-                            SonnerToast(self.root, "The document file was not found at the original location!", buttons=[{"text": "OK", "command": None}])
+                            SonnerToast(self.root, "The document file was not found at the original location!", variant='warning',buttons=[{"text": "OK", "command": None}])
                     else:
-                        SonnerToast(self.root, "Document information not found!", buttons=[{"text": "OK", "command": None}])
+                        SonnerToast(self.root, "Document information not found!",variant='error', buttons=[{"text": "OK", "command": None}])
                 else:
                     self.current_document = None
                     self.current_document_id = None
                     self.show_chat_screen()
             else:
-                SonnerToast(self.root, "Could not load the selected chat!", buttons=[{"text": "OK", "command": None}])
+                SonnerToast(self.root, "Could not load the selected chat!",variant='error', buttons=[{"text": "OK", "command": None}])
         except Exception as e:
             print(f"Error loading chat: {e}")
-            SonnerToast(self.root, "An error occurred while loading the chat!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "An error occurred while loading the chat!",variant='warning', buttons=[{"text": "OK", "command": None}])
 
     def logout(self):
         # Save current chat if there is one
@@ -3080,7 +3082,7 @@ class DocumentQnAApp:
                 "UPDATE users SET profile_image = ? WHERE id = ?",
                 (new_profile_path, self.current_user_id)
             )
-            SonnerToast(self.root, "Profile picture updated!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Profile picture updated!", variant='success',buttons=[{"text": "OK", "command": None}])
             # Immediately update the UI
             self.show_settings_screen()
             self.show_main_app()
@@ -3099,7 +3101,7 @@ class DocumentQnAApp:
                 self.current_chat_id = None
                 self.current_highlighted_source = None
                 self.show_chat_screen()
-            SonnerToast(self.root, "Do you want to save the current chat before starting a new one?", buttons=[{"text": "Yes", "command": on_yes}, {"text": "No", "command": on_no}], variant='warning')
+            SonnerToast(self.root, "Do you want to save the current chat before starting a new one?",variant='info', buttons=[{"text": "Yes", "command": on_yes}, {"text": "No", "command": on_no}], )
         else:
             self.current_chat = []
             self.current_chat_id = None
@@ -3109,10 +3111,10 @@ class DocumentQnAApp:
     def save_current_chat(self):
         """Save the current chat to database"""
         if not self.current_chat:
-            SonnerToast(self.root, "No chat to save!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "No chat to save!",variant='warning', buttons=[{"text": "OK", "command": None}])
             return
         if not self.current_document_id:
-            SonnerToast(self.root, "No document selected!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "No document selected!", variant='warning',buttons=[{"text": "OK", "command": None}])
             return
         try:
             if self.current_chat_id:
@@ -3164,9 +3166,9 @@ class DocumentQnAApp:
                                 source.get('char_span', (0, 0))[1]
                             )
                         )
-            SonnerToast(self.root, "Chat saved successfully!", buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Chat saved successfully!", variant='success',buttons=[{"text": "OK", "command": None}])
         except Exception as e:
-            SonnerToast(self.root, "Failed to save chat: " + str(e), buttons=[{"text": "OK", "command": None}])
+            SonnerToast(self.root, "Failed to save chat: " + str(e), variant='error',buttons=[{"text": "OK", "command": None}])
 
     def delete_document(self, doc_id, filename):
         # Remove from database
@@ -3183,7 +3185,7 @@ class DocumentQnAApp:
         #     if os.path.exists(filepath):
         #         os.remove(filepath)
         self.show_my_documents_screen()
-        SonnerToast(self.root, f"Document '{filename}' deleted.", buttons=[{"text": "OK", "command": None}])
+        SonnerToast(self.root, f"Document '{filename}' deleted.",variant='success', buttons=[{"text": "OK", "command": None}])
 
 
 def resource_path(relative_path):
@@ -3194,5 +3196,9 @@ def resource_path(relative_path):
 
 if __name__ == "__main__":
     root = Tk()
+    try:
+        root.iconbitmap(resource_path("logo.ico"))
+    except Exception as e:
+        print(f"Error setting window icon: {e}")
     app = DocumentQnAApp(root)
     root.mainloop()
